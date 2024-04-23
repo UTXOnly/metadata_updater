@@ -6,17 +6,10 @@ import secp256k1
 import time
 import websockets
 import requests
-from ddtrace import tracer
 import asyncio
-import uvloop  # Optional, but can provide faster event loop
-import concurrent.futures  # Import concurrent.futures for ThreadPoolExecutor
+import uvloop
+import concurrent.futures
 import time
-
-tracer.configure(
-    https=False,
-    hostname="localhost",
-    port="8126",
-)
 
 
 logging.basicConfig(
@@ -33,13 +26,21 @@ class NoteUpdater:
         self.events_found = []
         self.good_relays = []
         self.bad_relays = []
-        self.pubkey = "0d06480b0c6e3be3c9a1a65d7e6bc2091227d55bf4c77eeb6037ba7776c300ec"#"4503baa127bdfd0b054384dc5ba82cb0e2a8367cbdb0629179f00db1a34caacc"
+        self.pubkey = "<YOUR_SENDER_PUBKEY>"
         self.timestamp_set = set()
         self.high_time = 1
         self.all_good_relays = {}
         self.relay_event_pair = {}
         self.old_relays = []
         self.latest_note = ""
+        self.relays_kind4 = [
+            "wss://relay.nostpy.lol",
+            "wss://nostpy.serverless-nostr.com",
+            "wss://damus.io",
+            "wss://nostr.fmt.wiz.biz/",
+            "wss://nostr-pub.wellorder.net/",
+        ]
+        self.return_message = []
 
     def sign_event_id(self, event_id: str, private_key_hex: str) -> str:
         private_key = secp256k1.PrivateKey(bytes.fromhex(private_key_hex))
@@ -75,10 +76,10 @@ class NoteUpdater:
         return hashlib.sha256(data_str.encode("UTF-8")).hexdigest()
 
     def create_event(self, public_key, private_key_hex):
-        tags = []
+        tags = [["p", self.return_event]]
         created_at = int(time.time())
-        kind_number = 1
-        content = "testing search stuff"  # random_sentence
+        kind_number = 4
+        content = f" I dun fixed ur shit: nostr:npub1g5pm4gf8hh7skp2rsnw9h2pvkr32sdnuhkcx9yte7qxmrg6v4txqqudjqv"  # {self.return_message}'  # random_sentence
         event_id = self.calc_event_id(
             public_key, created_at, kind_number, tags, content
         )
@@ -111,34 +112,38 @@ class NoteUpdater:
             logger.error(f"Error verifying signature for event {event_id}: {e}")
             return False
 
-    async def send_event(self, ws_relay, public_key, private_key_hex):
-        async with websockets.connect(ws_relay) as ws:
-            logger.info("WebSocket connection created.")
+    async def send_event(self, public_key, private_key_hex):
+        event_data = self.create_event(public_key, private_key_hex)
+        sig = event_data.get("sig")
+        id = event_data.get("id")
+        print(f"event_created is: {event_data}")
+        signature_valid = self.verify_signature(id, public_key, sig)
+        if signature_valid:
+            for ws_relay in self.relays_kind4:
+                print(f"ws relay is {ws_relay}")
+                try:
+                    async with websockets.connect(ws_relay) as ws:
+                        logger.info("WebSocket connection created.")
 
-            for i in range(1):
-                event_data = self.create_event(public_key, private_key_hex)
-                sig = event_data.get("sig")
-                id = event_data.get("id")
-                signature_valid = self.verify_signature(id, public_key, sig)
-
-                if signature_valid:
-                    event_json = json.dumps(("EVENT", event_data))
-                    await ws.send(event_json)
-                    logger.info(f"Event sent: {event_json}")
-                else:
-                    logger.error("Invalid signature, event not sent.")
-            logger.info("WebSocket connection closed.")
+                        event_json = json.dumps(("EVENT", event_data))
+                        await ws.send(event_json)
+                        logger.info(f"Event sent: {event_json}")
+                        response = json.loads(
+                            await asyncio.wait_for(ws.recv(), timeout=1)
+                        )
+                        logger.info(f"DM response is {response}")
+                        logger.info("WebSocket connection closed.")
+                except Exception as exc:
+                    logger.error(f"Failed to return DM to relay {ws_relay}")
 
     async def query(self, relay):
         try:
             async with websockets.connect(relay) as ws:
                 query_dict = {
-                    "kinds": [0],  # [1,7, 9735, 30023],
+                    "kinds": [0],
                     "limit": 300,
-                    "since": 179340343,  # past_time,
-                    "authors": [
-                        self.pubkey
-                    ],
+                    "since": 179340343,
+                    "authors": [self.pubkey],
                 }
 
                 q = query_dict
@@ -148,7 +153,6 @@ class NoteUpdater:
                 logger.info(f"Query sent to relay {relay}: {query_ws}")
                 try:
                     response = json.loads(await asyncio.wait_for(ws.recv(), timeout=1))
-                    # response = json.loads(response)
 
                     if response[0] == "EVENT":
                         self.relay_event_pair[relay] = response
@@ -156,11 +160,50 @@ class NoteUpdater:
                     else:
                         return
                 except asyncio.TimeoutError:
-                    logger.info("No response within 3 seconds, continuing...")
-                    return  # Exit the loop if no response within 3 seconds
+                    logger.info("No response within 1 second, continuing...")
+                    return
 
         except Exception as exc:
             logger.error(f"Exception is {exc}")
+
+    async def query_kind4(self):
+        for relay in self.relays_kind4:
+            try:
+                async with websockets.connect(relay) as ws:
+                    query_dict = {
+                        "kinds": [4],
+                        "limit": 300,
+                        "since": 179340343,
+                        "search": self.pubkey  # searches tags for scanner-listener pubkey
+                        # "authors": [
+                        #    self.pubkey
+                        # ],
+                    }
+
+                    query_ws = json.dumps(("REQ", "5326483051590112", query_dict))
+
+                    await ws.send(query_ws)
+                    logger.info(f"Query sent to relay {relay}: {query_ws}")
+                    try:
+                        response = json.loads(
+                            await asyncio.wait_for(ws.recv(), timeout=1)
+                        )
+
+                        if response[0] == "EVENT":
+                            print(f"event found , whole event{response}")
+                            print(f"event1 is {response[2]}")
+                            print(f'dm sender is {response[2]["pubkey"]}')
+                            self.return_event = response[2]["pubkey"]
+
+                            return response[1]
+                        else:
+                            return
+                    except asyncio.TimeoutError:
+                        logger.info("No response within 1 second, continuing...")
+                        return
+
+            except Exception as exc:
+                logger.error(f"Exception is {exc}")
 
     def integrity_check_whole(self):
         for relay in self.relay_event_pair:
@@ -182,18 +225,10 @@ class NoteUpdater:
             else:
                 self.bad_relays.append(relay)
 
-    #async def gather_queries(self):
-    #    self.online_relays = self._get_online_relays()
-    #    tasks = []
-    #    for relay in self.online_relays:
-    #        task = asyncio.create_task(self.query(relay))
-    #        tasks.append(task)
-    #    await asyncio.gather(*tasks)
     async def gather_queries(self):
         self.online_relays = self._get_online_relays()
         tasks = [asyncio.create_task(self.query(relay)) for relay in self.online_relays]
         await asyncio.gather(*tasks)
-    
 
     async def rebroadcast(self, relay):
         try:
@@ -210,22 +245,16 @@ class NoteUpdater:
         except Exception as exc:
             logger.error(f"Error rebroadcasting to {relay} : {exc}")
 
-    #async def gather_rebroadcast(self):
-    #    tasks = []
-    #    for relay in self.old_relays:
-    #        task = asyncio.create_task(self.rebroadcast(relay))
-    #        tasks.append(task)
-    #    await asyncio.gather(*tasks)
     async def gather_rebroadcast(self):
-        tasks = [asyncio.create_task(self.rebroadcast(relay)) for relay in self.old_relays]
+        tasks = [
+            asyncio.create_task(self.rebroadcast(relay)) for relay in self.old_relays
+        ]
         await asyncio.gather(*tasks)
-    
 
     def calculate_latest_event(self, note):
         if note["created_at"] > self.high_time:
             self.high_time = note["created_at"]
             self.latest_note = note
-            # print(f"new event time is {self.high_time}")
 
     async def list_old_relays(self, timestamp, relay):
         if timestamp < self.high_time:
@@ -235,50 +264,18 @@ class NoteUpdater:
         print(f"Newest timestmap is: {self.high_time}")
         for relay in self.all_good_relays:
             if self.all_good_relays[relay] < self.high_time:
-                print(
+                message = (
                     f"Relay has old timestamp {relay} : {self.all_good_relays[relay]}"
                 )
+                self.return_message.append(message)
+                print(message)
                 self.old_relays.append(relay)
             elif self.all_good_relays[relay] == self.high_time:
-                # print(f"Relay {relay} has latest timestmap: {self.all_good_relays[relay]} ")
-
                 pass
 
 
-#async def main():
-#    start_time = time.time()
-#
-#    update_obj = NoteUpdater()
-#
-#    await update_obj.gather_queries()
-#    gather_time = time.time()# - start_time
-#
-#    print(f"--- {gather_time - start_time} seconds --- to query relays")
-#
-#    #logger.info(f"diff timestamps are: {update_obj.timestamp_set}")
-#
-#    update_obj.integrity_check_whole()
-#    logger.info(f"Good relays are {update_obj.good_relays}")
-#    logger.info(f"Bad relays are {update_obj.bad_relays}")
-#    update_obj.calc_old_relays()
-#    calculate_time = time.time() #- gather_time
-#    print(f"--- {calculate_time - gather_time} seconds --- to perform calculations")
-#    # await update_obj.rebroadcast()
-#    await update_obj.gather_rebroadcast()
-#    rebroadcast_time = time.time()# - gather_time
-#    print(f"--- {rebroadcast_time - calculate_time} seconds --- to rebroadcast")
-#
-#    print(f"--- {(time.time() - start_time)} seconds --- final time")
-#
-#
-#asyncio.run(main())
-#
-
-
-# Import the NoteUpdater class and logger here
-
-# Optionally, set uvloop as the event loop policy for faster performance
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
 
 async def main():
     start_time = time.time()
@@ -286,27 +283,36 @@ async def main():
     update_obj = NoteUpdater()
 
     # Increase the number of worker threads
-    asyncio.get_event_loop().set_default_executor(
-        concurrent.futures.ThreadPoolExecutor(max_workers=100)  # Set max_workers to the desired number of threads
-    )
+    loop = asyncio.get_event_loop()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=200)
+    loop.set_default_executor(executor)
 
+    await update_obj.query_kind4()
     await update_obj.gather_queries()
-    gather_time = time.time()  # Measure time after gathering queries
 
+    gather_time = time.time()
     print(f"--- {gather_time - start_time} seconds --- to query relays")
 
     update_obj.integrity_check_whole()
-    logger.info(f"Good relays are {update_obj.good_relays}")
-    logger.info(f"Bad relays are {update_obj.bad_relays}")
+    logger.info(
+        f"Relays that return the corect timestpamp are {update_obj.good_relays}, Relays with bad time stamps are: {update_obj.bad_relays}"
+    )
+
     update_obj.calc_old_relays()
-    calculate_time = time.time()  # Measure time after calculations
+    calculate_time = time.time()
     print(f"--- {calculate_time - gather_time} seconds --- to perform calculations")
 
     await update_obj.gather_rebroadcast()
-    rebroadcast_time = time.time()  # Measure time after rebroadcasting
+    rebroadcast_time = time.time()
     print(f"--- {rebroadcast_time - calculate_time} seconds --- to rebroadcast")
 
-    print(f"--- {(time.time() - start_time)} seconds --- final time")
+    final_time = time.time() - start_time
+    print(f"--- {final_time} seconds --- final time")
+
+    await update_obj.send_event(
+        "<SCANNER_PUBKEY>",
+        "<SCANNER_PRIVKEY",
+    )
 
 
 asyncio.run(main())
