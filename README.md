@@ -29,8 +29,8 @@ The MEATADATA_UPDATER CLI is a Python script that queries and updates events on 
 1. Clone the repository:
 
     ```sh
-    git clone https://github.com/yourusername/noteupdater-cli.git
-    cd METADATA_UPDATER
+    git clone https://github.com/UTXOnly/metadata_updater.git
+    cd metadata_updater
     ```
 
 2. Install the required Python libraries:
