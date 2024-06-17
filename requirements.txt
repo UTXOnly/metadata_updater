@@ -1,0 +1,4 @@
+requests
+secp256k1
+uvloop
+websockets
