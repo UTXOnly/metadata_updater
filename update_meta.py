@@ -185,10 +185,10 @@ class NoteUpdater:
                 event_json = json.dumps(("EVENT", self.latest_note))
                 await ws.send(event_json)
                 print(
-                    f"Rebroadcasting latest kind 0: {event_json} note to: {relay}"
+                    f"Rebroadcasting latest kind 0: {event_json} note to:  \033[1;32m{relay}\033[0m"
                 )
                 response = json.loads(await asyncio.wait_for(ws.recv(), timeout=3))
-                logger.info(f"response 1 is {response[1]}")
+                logger.info(f"Event ID is {response[1]}")
                 if response[2] in ["true", "True"]:
                     self.updated_relays.append(relay)
         except asyncio.TimeoutError:
