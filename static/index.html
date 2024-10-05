@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pubkey Scanner - Dark Mode</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        h1, h2, h3, label {
+            color: #bb86fc;
+        }
+        .form-container {
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px #bb86fc;
+            max-width: 800px;
+            width: 100%;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input {
+            width: 100%;
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #bb86fc;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        button {
+            width: 100%;
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #bb86fc;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        button:hover {
+            background-color: #444;
+        }
+        #results-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 columns, each taking equal space */
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .results-column {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 5px #bb86fc;
+        }
+        .results-column ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .results-column ul li {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            border: 1px solid #bb86fc;
+        }
+        html, body {
+            overflow: auto; /* Allow scrolling for the whole page */
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Scan Pubkey</h1>
+        <form id="pubkey-form">
+            <div class="form-group">
+                <label for="pubkey">Enter pubkey:</label>
+                <input type="text" id="pubkey" name="pubkey" required>
+            </div>
+            <button type="submit">Scan</button>
+        </form>
+
+        <h2>Scan Results</h2>
+        <div id="results-container">
+            <div id="good-relays" class="results-column">
+                <h3>Good Relays</h3>
+                <ul></ul>
+            </div>
+            <div id="old-relays" class="results-column">
+                <h3>Old Relays</h3>
+                <ul></ul>
+            </div>
+            <div id="updated-relays" class="results-column">
+                <h3>Updated Relays</h3>
+                <ul></ul>
+            </div>
+            <div id="bad-relays" class="results-column">
+                <h3>Failed Relays</h3>
+                <ul></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('pubkey-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pubkey = document.getElementById('pubkey').value;
+
+            // Send pubkey to backend via POST request
+            try {
+                const response = await fetch('/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ pubkey: pubkey })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to scan pubkey");
+                }
+
+                // Get the JSON response
+                const data = await response.json();
+                
+                // Select the list containers
+                const goodRelaysList = document.querySelector('#good-relays ul');
+                const oldRelaysList = document.querySelector('#old-relays ul');
+                const updatedRelaysList = document.querySelector('#updated-relays ul');
+                const badRelaysList = document.querySelector('#bad-relays ul');
+
+                // Clear previous results
+                goodRelaysList.innerHTML = '';
+                oldRelaysList.innerHTML = '';
+                updatedRelaysList.innerHTML = '';
+                badRelaysList.innerHTML = '';
+
+                // Populate results into respective columns
+                goodRelaysList.innerHTML = data.good_relays.map(relay => `<li>${relay}</li>`).join('');
+                oldRelaysList.innerHTML = data.old_relays.map(relay => `<li>${relay}</li>`).join('');
+                updatedRelaysList.innerHTML = (data.updated_relays || []).map(relay => `<li>${relay}</li>`).join('');
+                badRelaysList.innerHTML = data.bad_relays.map(relay => `<li>${relay}</li>`).join('');
+            } catch (error) {
+                document.getElementById('results-container').innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
