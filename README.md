@@ -32,7 +32,7 @@ docker build -t nostr-metadata-updater .
 ### Run the Docker container:
 
 ```bash
-docker run -d --name metadata-updater -p 8000:8000 nostr-metadata-updater```
+docker run -d --name metadata-updater -p 8000:8000 nostr-metadata-updater
 ```
 
 The application will run in the background, exposing the FastAPI web application on http://localhost:8000.
