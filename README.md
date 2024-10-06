@@ -1,6 +1,8 @@
-# MEATADATA_UPDATER CLI
+# Nostr Metadata Updater
 
-The MEATADATA_UPDATER CLI is a Python script that queries and updates events on Nostr relays. It can be used to check for outdated events and rebroadcast the latest event to the relays found to have old `kind 0` events.
+The Nostr Metadata Updater is a containerized web application powered by `FastAPI` and `asyncio`. It queries and updates metadata on Nostr relays in real-time. The app checks for outdated events (kind 0) on various relays and rebroadcasts the latest metadata to those relays found to have outdated events.
+
+This application leverages `FastAPI` to provide a web-based interface and uses `asyncio` to handle asynchronous queries to the relays, ensuring high performance and responsiveness.
 
 ## Features
 
@@ -8,40 +10,63 @@ The MEATADATA_UPDATER CLI is a Python script that queries and updates events on 
 - Identifies relays with outdated events.
 - Rebroadcasts the latest event to relays with outdated events.
 
+
 ## Requirements
 
-- Python 3.7+
-- The following Python libraries:
-  - `argparse`
-  - `asyncio`
-  - `concurrent.futures`
-  - `hashlib`
-  - `json`
-  - `logging`
-  - `time`
-  - `requests`
-  - `secp256k1`
-  - `uvloop`
-  - `websockets`
+- [Docker](https://docs.docker.com/get-docker/)
 
-## Installation
+## Build and Run
 
-1. Clone the repository:
+Clone the repository:
 
-    ```sh
-    git clone https://github.com/UTXOnly/metadata_updater.git
-    cd metadata_updater
-    ```
+```bash
+git clone https://github.com/UTXOnly/metadata_updater.git
+cd metadata_updater
+```
 
-2. Install the required Python libraries:
+### Build the Docker image:
 
-    ```sh
-    pip install -r requirements.txt
-    ```
+```bash
+docker build -t nostr-metadata-updater .
+```
+### Run the Docker container:
 
-## Usage
+```bash
+docker run -d --name metadata-updater -p 8000:8000 nostr-metadata-updater```
+```
 
-Run the script with a public key hex to query for old kind 0 events:
+The application will run in the background, exposing the FastAPI web application on http://localhost:8000.
 
-```sh
-python3 update_meta.py <public_key_hex_to_scan_+_update>
+### Troubleshooting
+If you encounter any issues, you can inspect the container logs to see any errors or warnings:
+
+#### Check the container logs:
+
+```bash
+docker logs metadata-updater
+```
+To view real-time logs, use the following command:
+
+```bash
+docker logs -f metadata-updater
+```
+
+#### Stopping and Cleaning Up
+
+To stop and clean up the container:
+
+##### Stop the container:
+
+```bash
+docker stop metadata-updater
+```
+Remove the container:
+
+```bash
+docker rm metadata-updater
+```
+**Optional: Remove the Docker image if you want to clean up all images and start fresh:**
+
+```bash
+docker rmi nostr-metadata-updater
+```
