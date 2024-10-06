@@ -1,4 +1,7 @@
+fastapi
+uvicorn
 requests
-secp256k1
 uvloop
 websockets
+secp256k1
+bech32
