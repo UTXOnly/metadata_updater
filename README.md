@@ -4,6 +4,9 @@ The Nostr Metadata Updater is a containerized web application powered by `FastAP
 
 This application leverages `FastAPI` to provide a web-based interface and uses `asyncio` to handle asynchronous queries to the relays, ensuring high performance and responsiveness.
 
+![image](https://github.com/user-attachments/assets/1259ee9a-82a5-4522-a36e-9181ac8a89e1)
+
+
 ## Features
 
 - Queries online Nostr relays for events.
