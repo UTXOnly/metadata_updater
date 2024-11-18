@@ -93,7 +93,7 @@
             margin-bottom: 5px;
             border: 1px solid #bb86fc;
         }
-        #loading-gif {
+        #loading-gif-container {
             display: none;
             text-align: center;
             margin-top: 15px;
@@ -139,8 +139,8 @@
         </div>
 
 
-        <div id="loading-gif">
-            <img src="https://image.nostr.build/edf37721ffe26d490f5274ac2990f1af355f2c84462f9c57e462d1a530c6de88.gif" alt="Loading..." width="600px" />
+        <div id="loading-gif-container">
+            <img id="loading-gif"src="https://image.nostr.build/edf37721ffe26d490f5274ac2990f1af355f2c84462f9c57e462d1a530c6de88.gif" alt="Loading..." width="600px" />
         </div>
 
         <h2>Scan Results</h2>
@@ -170,15 +170,24 @@
     
     <script>
         const form = document.getElementById('pubkey-form');
+        const loadingGifContainer = document.getElementById('loading-gif-container');
         const loadingGif = document.getElementById('loading-gif');
         const loadingText = document.getElementById('loading-text');
+        // Define a list of URLs to gifs to show when the scan is loading
+        const loadingGifList = [
+            "https://image.nostr.build/edf37721ffe26d490f5274ac2990f1af355f2c84462f9c57e462d1a530c6de88.gif"
+        ];
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const pubkey = document.getElementById('pubkey').value;
 
+            // Select a random gif to be shown and apply it to the HTML
+            const randomlySelectedGif = loadingGifList[Math.floor(Math.random() * loadingGifList.length)];
+            loadingGif.setAttribute('src', randomlySelectedGif);
+
             // Show loading GIF and text while the scan is running
-            loadingGif.style.display = 'block';
+            loadingGifContainer.style.display = 'block';
             loadingText.style.display = 'block';
 
             // Send pubkey to backend via POST request
